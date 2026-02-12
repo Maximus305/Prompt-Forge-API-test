@@ -3,22 +3,32 @@ import { NextRequest, NextResponse } from 'next/server';
 interface PromptRequest {
   apiUrl: string;
   apiKey: string;
-  prompt: string;
+  body: string;
 }
 
 export async function POST(req: NextRequest) {
-  let body: PromptRequest;
+  let payload: PromptRequest;
   try {
-    body = await req.json();
+    payload = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { apiUrl, apiKey, prompt } = body;
+  const { apiUrl, apiKey, body } = payload;
 
-  if (!apiUrl || !apiKey || !prompt) {
+  if (!apiUrl || !apiKey || !body) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
+
+  // Parse the body to validate it's valid JSON
+  let parsedBody: unknown;
+  try {
+    parsedBody = JSON.parse(body);
+  } catch {
+    return NextResponse.json({ error: 'Request body is not valid JSON' }, { status: 400 });
+  }
+
+  const startTime = Date.now();
 
   try {
     const response = await fetch(apiUrl, {
@@ -27,25 +37,45 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1000,
-      }),
+      body: JSON.stringify(parsedBody),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: `API returned ${response.status}: ${JSON.stringify(errorData)}` },
-        { status: response.status }
-      );
+    const duration = Date.now() - startTime;
+
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
+    const responseText = await response.text();
+    let responseData: unknown;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = responseText;
     }
 
-    const data = await response.json();
-    return NextResponse.json({ result: data });
+    return NextResponse.json({
+      result: responseData,
+      meta: {
+        status: response.status,
+        statusText: response.statusText,
+        duration,
+        responseHeaders,
+        sentBody: parsedBody,
+      },
+    }, { status: response.ok ? 200 : response.status });
   } catch (error) {
-    console.error('Proxy error:', error);
-    return NextResponse.json({ error: 'Failed to reach the API' }, { status: 502 });
+    const duration = Date.now() - startTime;
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Failed to reach the API',
+      meta: {
+        status: 0,
+        statusText: 'Network Error',
+        duration,
+        responseHeaders: {},
+        sentBody: parsedBody,
+      },
+    }, { status: 502 });
   }
 }
