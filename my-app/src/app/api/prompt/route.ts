@@ -1,45 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-interface PromptRequest {
-  apiUrl: string;
+interface ProxyRequest {
+  targetUrl: string;
   apiKey: string;
-  body: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: string;
 }
 
 export async function POST(req: NextRequest) {
-  let payload: PromptRequest;
+  let payload: ProxyRequest;
   try {
     payload = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { apiUrl, apiKey, body } = payload;
+  const { targetUrl, apiKey, method, body } = payload;
 
-  if (!apiUrl || !apiKey || !body) {
+  if (!targetUrl || !apiKey || !method) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
-
-  // Parse the body to validate it's valid JSON
-  let parsedBody: unknown;
-  try {
-    parsedBody = JSON.parse(body);
-  } catch {
-    return NextResponse.json({ error: 'Request body is not valid JSON' }, { status: 400 });
   }
 
   const startTime = Date.now();
 
-  try {
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(parsedBody),
-    });
+  const fetchOptions: RequestInit = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+  };
 
+  if (body && (method === 'POST' || method === 'PUT')) {
+    fetchOptions.body = body;
+  }
+
+  try {
+    const response = await fetch(targetUrl, fetchOptions);
     const duration = Date.now() - startTime;
 
     const responseHeaders: Record<string, string> = {};
@@ -62,9 +59,8 @@ export async function POST(req: NextRequest) {
         statusText: response.statusText,
         duration,
         responseHeaders,
-        sentBody: parsedBody,
       },
-    }, { status: response.ok ? 200 : response.status });
+    });
   } catch (error) {
     const duration = Date.now() - startTime;
     return NextResponse.json({
@@ -74,7 +70,6 @@ export async function POST(req: NextRequest) {
         statusText: 'Network Error',
         duration,
         responseHeaders: {},
-        sentBody: parsedBody,
       },
     }, { status: 502 });
   }
