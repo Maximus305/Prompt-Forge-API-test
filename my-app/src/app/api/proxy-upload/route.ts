@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
-export const runtime = 'nodejs'; // Use this to specify the runtime environment
-
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type');
   if (!contentType?.includes('multipart/form-data')) {
@@ -10,7 +8,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Convert the request body to a buffer
     const body = await req.arrayBuffer();
     const buffer = Buffer.from(body);
 
