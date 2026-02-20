@@ -205,7 +205,6 @@ export default function PromptForge() {
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [mode, setMode] = useState<'compile' | 'tests' | 'explorer'>('compile');
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<Endpoint>(ENDPOINTS[0]);
   const [resourceId, setResourceId] = useState('');
   const [body, setBody] = useState('');
@@ -250,7 +249,6 @@ export default function PromptForge() {
     if (savedKey) setApiKey(savedKey);
     if (savedUrl) setBaseUrl(savedUrl);
     else setBaseUrl('https://main.d2r2bhlvzb3q6.amplifyapp.com');
-    if (!savedKey) setSettingsOpen(true);
     if (savedTestsRaw) {
       try { setSavedTests(JSON.parse(savedTestsRaw)); } catch { /* ignore */ }
     }
@@ -927,7 +925,6 @@ export default function PromptForge() {
             ) : (
               savedTests.map((test) => {
                 const result = testResults[test.id];
-                const isRunning = runningTestId === test.id;
                 return (
                   <div key={test.id} className="rounded-xl border bg-card shadow-sm overflow-hidden">
                     {/* Test header */}
